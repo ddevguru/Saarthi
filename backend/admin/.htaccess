@@ -1,0 +1,26 @@
+# SAARTHI Admin Panel - Apache Configuration
+# Ensure PHP files are processed correctly
+
+# Enable PHP processing
+AddType application/x-httpd-php .php
+
+# Set default charset
+AddDefaultCharset UTF-8
+
+# Prevent directory listing
+Options -Indexes
+
+# Security headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# PHP settings
+<IfModule mod_php7.c>
+    php_flag display_errors Off
+    php_flag log_errors On
+    php_value error_log ../logs/error.log
+</IfModule>
+
