@@ -20,6 +20,8 @@ class WakeWordService {
     'sarthi',
     'hey saarthi',
     'ok saarthi',
+    'hi saarthi',
+    'hello saarthi',
   ];
 
   Future<void> initialize() async {
@@ -69,6 +71,9 @@ class WakeWordService {
     _listenForWakeWord();
   }
 
+  /// Listen for wake word "saarthi" only
+  /// NOTE: This uses phone microphone ONLY for wake word detection
+  /// Audio recording for events/emergencies is handled by ESP32-CAM external microphone
   void _listenForWakeWord() {
     if (!_isListening) return;
     
@@ -81,14 +86,20 @@ class WakeWordService {
           print('Wake word service heard: $text');
           
           // Check if any wake word is detected (case-insensitive, partial match)
+          // Also check for "hey" or "hi" followed by "saarthi"
+          final textLower = text.toLowerCase().trim();
+          
+          // Check direct wake words
           for (final wakeWord in _wakeWords) {
-            if (text.contains(wakeWord.toLowerCase()) || 
-                text == wakeWord.toLowerCase() ||
-                text.startsWith(wakeWord.toLowerCase())) {
-              print('Wake word detected: $wakeWord in "$text"');
+            final wakeWordLower = wakeWord.toLowerCase();
+            if (textLower.contains(wakeWordLower) || 
+                textLower == wakeWordLower ||
+                textLower.startsWith(wakeWordLower) ||
+                textLower.endsWith(wakeWordLower)) {
+              print('Wake word "saarthi" detected: $wakeWord in "$text"');
               _onWakeWordDetected?.call();
               _stopListening();
-              // Restart listening after wake word detected
+              // Restart listening for wake word after command is processed
               Future.delayed(const Duration(milliseconds: 500), () {
                 if (_onWakeWordDetected != null) {
                   _listenForWakeWord();
@@ -97,11 +108,25 @@ class WakeWordService {
               return;
             }
           }
+          
+          // Check for "hey/hi/hello" + "saarthi" pattern
+          if ((textLower.contains('hey') || textLower.contains('hi') || textLower.contains('hello')) &&
+              (textLower.contains('saarthi') || textLower.contains('sarthi') || textLower.contains('सारथी'))) {
+            print('Wake word pattern detected: "hey/hi saarthi" in "$text"');
+            _onWakeWordDetected?.call();
+            _stopListening();
+            Future.delayed(const Duration(milliseconds: 500), () {
+              if (_onWakeWordDetected != null) {
+                _listenForWakeWord();
+              }
+            });
+            return;
+          }
         }
         
-        // If final result and no wake word, restart listening
+        // If final result and no wake word, restart listening for wake word
         if (result.finalResult) {
-          // Continue listening if no wake word detected
+          // Continue listening if no wake word detected - wait for "saarthi"
           if (_isListening) {
             Future.delayed(const Duration(milliseconds: 300), () {
               _listenForWakeWord();

@@ -3,6 +3,7 @@
  * Main screen for users with SOS button and device status
  */
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -11,7 +12,7 @@ import '../../../data/services/location_service.dart';
 import '../../../data/services/device_service.dart';
 import '../../../data/services/voice_assistant_service.dart';
 import '../../../data/services/smart_ai_service.dart';
-import '../../../data/services/audio_recording_service.dart';
+// AudioRecordingService import removed - phone microphone recording is DISABLED
 import '../../../data/services/touch_sensor_service.dart';
 import '../../../data/services/api_client.dart';
 import '../../../data/models/device.dart';
@@ -19,6 +20,8 @@ import '../../../core/constants.dart';
 import '../../widgets/device_status_card.dart';
 import '../../widgets/voice_assistant_button.dart';
 import '../../widgets/smart_ai_card.dart';
+import '../../widgets/glassmorphic_container.dart';
+import '../../../core/neon_colors.dart';
 import 'package:saarthi/l10n/app_localizations.dart';
 
 class UserHomeScreen extends StatefulWidget {
@@ -33,7 +36,8 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
   final DeviceService _deviceService = DeviceService();
   final VoiceAssistantService _voiceAssistant = VoiceAssistantService(); // Singleton
   final SmartAIService _smartAI = SmartAIService();
-  final AudioRecordingService _audioRecorder = AudioRecordingService();
+  // AudioRecordingService removed - phone microphone recording is DISABLED
+  // ESP32-CAM handles all audio recording via external microphone
   final TouchSensorService _touchSensor = TouchSensorService();
   bool _isSharingLocation = false;
   Device? _device;
@@ -67,10 +71,10 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
   Future<void> _handleLongPress() async {
     print('Long press detected - triggering critical emergency');
     // Long press = Critical Emergency alert
-    await _voiceAssistant.speak("Critical emergency! गंभीर आपातकाल! Recording started. रिकॉर्डिंग शुरू हो गई है।");
+    await _voiceAssistant.speak("Critical emergency! गंभीर आपातकाल!");
     
-    // Start audio recording
-    await _audioRecorder.startRecording();
+    // ESP32-CAM will automatically record audio from external microphone
+    // No need to record from phone - ESP32 handles it
     
     // Capture photo via ESP32 (send command to backend)
     try {
@@ -87,10 +91,10 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
       print('Error triggering photo capture: $e');
     }
     
-    // Send emergency event to backend
+    // Send emergency event to backend (ESP32 will record audio automatically)
     try {
       final apiClient = ApiClient();
-      final response = await apiClient.post(
+      await apiClient.post(
         '/device/emergencyAlert.php',
         {
           'event_type': 'LONG_PRESS_EMERGENCY',
@@ -98,31 +102,18 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
         },
         requireAuth: true,
       );
-      
-      // Get event ID from response for linking audio
-      if (response['data'] != null && response['data']['event_id'] != null) {
-        final eventId = response['data']['event_id'] as int;
-        _audioRecorder.setEventId(eventId);
-      }
     } catch (e) {
       print('Error sending emergency alert: $e');
     }
-    
-    // Stop recording after 10 seconds and upload
-    Future.delayed(const Duration(seconds: 10), () async {
-      if (_audioRecorder.isRecording) {
-        await _audioRecorder.stopRecording();
-      }
-    });
   }
 
   Future<void> _handleSingleTap() async {
     print('Single tap detected - triggering emergency alert');
     // Single tap = Emergency alert (not voice assistant)
-    await _voiceAssistant.speak("Emergency alert! आपातकालीन चेतावनी! Recording started. रिकॉर्डिंग शुरू हो गई है।");
+    await _voiceAssistant.speak("Emergency alert! आपातकालीन चेतावनी!");
     
-    // Start audio recording
-    await _audioRecorder.startRecording();
+    // ESP32-CAM will automatically record audio from external microphone
+    // No need to record from phone - ESP32 handles it
     
     // Capture photo via ESP32 (send command to backend)
     try {
@@ -139,10 +130,10 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
       print('Error triggering photo capture: $e');
     }
     
-    // Send emergency event to backend
+    // Send emergency event to backend (ESP32 will record audio automatically)
     try {
       final apiClient = ApiClient();
-      final response = await apiClient.post(
+      await apiClient.post(
         '/device/emergencyAlert.php',
         {
           'event_type': 'SINGLE_TAP_EMERGENCY',
@@ -150,22 +141,9 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
         },
         requireAuth: true,
       );
-      
-      // Get event ID from response for linking audio
-      if (response['data'] != null && response['data']['event_id'] != null) {
-        final eventId = response['data']['event_id'] as int;
-        _audioRecorder.setEventId(eventId);
-      }
     } catch (e) {
       print('Error sending emergency alert: $e');
     }
-    
-    // Stop recording after 10 seconds and upload
-    Future.delayed(const Duration(seconds: 10), () async {
-      if (_audioRecorder.isRecording) {
-        await _audioRecorder.stopRecording();
-      }
-    });
   }
 
   Future<void> _handleDoubleTap() async {
@@ -199,7 +177,12 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
           
           // Initialize video player if device is online and stream URL is available
           if (_deviceService.checkDeviceOnline(_device) && _streamUrl != null && _streamUrl!.isNotEmpty) {
-            _initializeVideoPlayer();
+            // Delay initialization slightly to ensure state is set
+            Future.delayed(const Duration(milliseconds: 500), () {
+              if (mounted) {
+                _initializeVideoPlayer();
+              }
+            });
           }
         });
         
@@ -219,7 +202,12 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
             
             // Initialize video player if device is online and stream URL is available
             if (_deviceService.checkDeviceOnline(_device) && _streamUrl != null && _streamUrl!.isNotEmpty) {
-              _initializeVideoPlayer();
+              // Delay initialization slightly to ensure state is set
+              Future.delayed(const Duration(milliseconds: 500), () {
+                if (mounted) {
+                  _initializeVideoPlayer();
+                }
+              });
             }
           });
         }
@@ -300,210 +288,330 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
     final l10n = AppLocalizations.of(context)!;
     
     return Scaffold(
+      backgroundColor: const Color(0xFF1A1A1A),
       appBar: AppBar(
-        title: Text(l10n.home),
+        backgroundColor: const Color(0xFF2D2D2D),
+        elevation: 0,
+        title: ShaderMask(
+          shaderCallback: NeonColors.lightNeonGradientShader,
+          child: Text(
+            l10n.home,
+            style: NeonColors.neonText(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: NeonColors.lightNeonPink,
+            ),
+          ),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings),
+            icon: const Icon(Icons.settings, color: Colors.white),
             onPressed: () {
               Navigator.pushNamed(context, '/settings');
             },
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Device Status Card
-            _isLoadingDevice
-                ? const Card(
-                    child: Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Center(child: CircularProgressIndicator()),
-                    ),
-                  )
-                : _device == null
-                    ? Card(
-                        color: Colors.orange[50],
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF1A1A1A), // Dark gray/black
+              Color(0xFF2D2D2D), // Slightly lighter dark
+              Color(0xFF1F1F1F), // Dark
+            ],
+          ),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Device Status Card with Glassmorphism
+              _isLoadingDevice
+                  ? GlassmorphicContainer(
+                      padding: const EdgeInsets.all(24.0),
+                      borderRadius: 20,
+                      child: const Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF6B9D)),
+                        ),
+                      ),
+                    )
+                  : _device == null
+                      ? GlassmorphicContainer(
+                          padding: const EdgeInsets.all(20.0),
+                          borderRadius: 20,
+                          gradientColors: [
+                            const Color(0xFFFF6B9D).withOpacity(0.2),
+                            const Color(0xFFFF6B9D).withOpacity(0.1),
+                          ],
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
                                 children: [
-                                  Icon(Icons.info_outline, color: Colors.orange[700]),
+                                  const Icon(
+                                    Icons.info_outline,
+                                    color: Color(0xFFFF6B9D),
+                                  ),
                                   const SizedBox(width: 8),
                                   Text(
                                     'No Device Found',
-                                    style: Theme.of(context).textTheme.titleLarge,
+                                    style: NeonColors.neonText(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: NeonColors.lightNeonPink,
+                                    ),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 8),
                               Text(
                                 'Please register your ESP32-CAM device. Make sure the device is connected and registered with your account.',
-                                style: Theme.of(context).textTheme.bodyMedium,
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: Colors.white70,
+                                ),
                               ),
                             ],
                           ),
+                        )
+                      : GlassmorphicContainer(
+                          padding: const EdgeInsets.all(20.0),
+                          borderRadius: 20,
+                          child: DeviceStatusCard(
+                            isConnected: _deviceService.checkDeviceOnline(_device),
+                            lastEvent: null,
+                            lastEventTime: _device?.lastSeen,
+                          ),
                         ),
-                      )
-                    : DeviceStatusCard(
-                        isConnected: _deviceService.checkDeviceOnline(_device),
-                        lastEvent: null, // TODO: Get from API
-                        lastEventTime: _device?.lastSeen,
-                      ),
             const SizedBox(height: 24),
             
-            // Live Stream Section
-            if (_device != null && _streamUrl != null && _streamUrl!.isNotEmpty && _deviceService.checkDeviceOnline(_device))
-              Card(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Row(
+              // Live Stream Section with Glassmorphism
+              if (_device != null && _streamUrl != null && _streamUrl!.isNotEmpty && _deviceService.checkDeviceOnline(_device))
+                GlassmorphicContainer(
+                  padding: const EdgeInsets.all(16.0),
+                  borderRadius: 20,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
                         children: [
-                          const Icon(Icons.videocam, color: AppTheme.secondaryColor),
+                          const Icon(
+                            Icons.videocam,
+                            color: Color(0xFF4ECDC4), // Cyan/Blue
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             'Live Stream',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (_isStreamInitialized && _videoController != null && _videoController!.value.isInitialized)
-                      AspectRatio(
-                        aspectRatio: 16 / 9,
-                        child: VideoPlayer(_videoController!),
-                      )
-                    else
-                      const Padding(
-                        padding: EdgeInsets.all(32.0),
-                        child: Center(child: CircularProgressIndicator()),
-                      ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (_videoController != null && _isStreamInitialized)
-                            IconButton(
-                              icon: Icon(
-                                _videoController!.value.isPlaying
-                                    ? Icons.pause
-                                    : Icons.play_arrow,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  if (_videoController!.value.isPlaying) {
-                                    _videoController!.pause();
-                                  } else {
-                                    _videoController!.play();
-                                  }
-                                });
-                              },
+                            style: NeonColors.neonText(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: NeonColors.lightNeonCyan,
                             ),
-                          IconButton(
-                            icon: const Icon(Icons.open_in_browser),
-                            onPressed: () async {
-                              if (_streamUrl != null) {
-                                final uri = Uri.parse(_streamUrl!);
-                                if (await canLaunchUrl(uri)) {
-                                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                                }
-                              }
-                            },
-                            tooltip: 'Open in Browser',
                           ),
                         ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 12),
+                      if (_isStreamInitialized && _videoController != null && _videoController!.value.isInitialized)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: AspectRatio(
+                            aspectRatio: 16 / 9,
+                            child: VideoPlayer(_videoController!),
+                          ),
+                        )
+                      else
+                        const Padding(
+                          padding: EdgeInsets.all(32.0),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4ECDC4)),
+                            ),
+                          ),
+                        ),
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (_videoController != null && _isStreamInitialized)
+                              IconButton(
+                                icon: Icon(
+                                  _videoController!.value.isPlaying
+                                      ? Icons.pause
+                                      : Icons.play_arrow,
+                                  color: Colors.white,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    if (_videoController!.value.isPlaying) {
+                                      _videoController!.pause();
+                                    } else {
+                                      _videoController!.play();
+                                    }
+                                  });
+                                },
+                              ),
+                            IconButton(
+                              icon: const Icon(Icons.open_in_browser, color: Colors.white),
+                              onPressed: () async {
+                                if (_streamUrl != null) {
+                                  final uri = Uri.parse(_streamUrl!);
+                                  if (await canLaunchUrl(uri)) {
+                                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                  }
+                                }
+                              },
+                              tooltip: 'Open in Browser',
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
             const SizedBox(height: 24),
             
             // Smart AI Analysis Card
             SmartAICard(smartAI: _smartAI),
             const SizedBox(height: 24),
             
-            // SOS Button
-            ElevatedButton(
-              onPressed: _triggerSOS,
-              style: AppTheme.sosButtonStyle,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+              // SOS Button with Glassmorphism
+              GlassmorphicContainer(
+                padding: const EdgeInsets.all(20.0),
+                borderRadius: 20,
+                gradientColors: [
+                  const Color(0xFFCC0000).withOpacity(0.3),
+                  const Color(0xFFCC0000).withOpacity(0.2),
+                ],
+                child: ElevatedButton(
+                  onPressed: _triggerSOS,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.warning, size: 48, color: Colors.white),
+                      const SizedBox(height: 8),
+                      Text(
+                        l10n.sosButton,
+                        style: NeonColors.neonText(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: NeonColors.lightNeonPink,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            const SizedBox(height: 24),
+            
+              // Location Sharing Toggle with Glassmorphism
+              GlassmorphicContainer(
+                padding: EdgeInsets.zero,
+                borderRadius: 15,
+                child: SwitchListTile(
+                  title: Text(
+                    l10n.shareLocation,
+                    style: NeonColors.neonText(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: NeonColors.lightNeonCyan,
+                    ),
+                  ),
+                  subtitle: Text(
+                    _isSharingLocation 
+                        ? 'Location is being shared' 
+                        : 'Enable to share live location',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                    ),
+                  ),
+                  value: _isSharingLocation,
+                  activeColor: const Color(0xFF4ECDC4),
+                  onChanged: (value) {
+                    setState(() {
+                      _isSharingLocation = value;
+                      if (value) {
+                        _startLocationSharing();
+                      } else {
+                        _stopLocationSharing();
+                      }
+                    });
+                  },
+                ),
+              ),
+            const SizedBox(height: 16),
+            
+              // Quick Actions with Glassmorphism
+              Row(
                 children: [
-                  const Icon(Icons.warning, size: 48),
-                  const SizedBox(height: 8),
-                  Text(
-                    l10n.sosButton,
-                    style: const TextStyle(fontSize: 24),
+                  Expanded(
+                    child: GlassmorphicContainer(
+                      padding: EdgeInsets.zero,
+                      borderRadius: 15,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/navigation-assist');
+                        },
+                        icon: const Icon(Icons.navigation, color: Colors.white),
+                        label: Text(
+                          l10n.navigation,
+                          style: NeonColors.neonText(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: NeonColors.lightNeonCyan,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          padding: const EdgeInsets.all(16),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: GlassmorphicContainer(
+                      padding: EdgeInsets.zero,
+                      borderRadius: 15,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/quick-messages');
+                        },
+                        icon: const Icon(Icons.message, color: Colors.white),
+                        label: Text(
+                          l10n.quickMessages,
+                          style: NeonColors.neonText(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: NeonColors.lightNeonPink,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          padding: const EdgeInsets.all(16),
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 24),
-            
-            // Location Sharing Toggle
-            Card(
-              child: SwitchListTile(
-                title: Text(l10n.shareLocation),
-                subtitle: Text(_isSharingLocation 
-                    ? 'Location is being shared' 
-                    : 'Enable to share live location'),
-                value: _isSharingLocation,
-                onChanged: (value) {
-                  setState(() {
-                    _isSharingLocation = value;
-                    if (value) {
-                      _startLocationSharing();
-                    } else {
-                      _stopLocationSharing();
-                    }
-                  });
-                },
-              ),
-            ),
-            const SizedBox(height: 16),
-            
-            // Quick Actions
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/navigation-assist');
-                    },
-                    icon: const Icon(Icons.navigation),
-                    label: Text(l10n.navigation),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.all(16),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/quick-messages');
-                    },
-                    icon: const Icon(Icons.message),
-                    label: Text(l10n.quickMessages),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.all(16),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       floatingActionButton: VoiceAssistantButton(
@@ -516,11 +624,33 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
   static const int _maxRetries = 3;
   
   void _initializeVideoPlayer() {
-    if (_streamUrl != null && !_isStreamInitialized && _retryCount < _maxRetries) {
-      _videoController?.dispose();
-      
-      // Handle HTTP streams - allow cleartext for local network
+    if (_streamUrl == null || _streamUrl!.isEmpty) {
+      print('Stream URL is null or empty');
+      return;
+    }
+    
+    if (_isStreamInitialized) {
+      print('Video player already initialized');
+      return;
+    }
+    
+    if (_retryCount >= _maxRetries) {
+      print('Max retries reached for video player initialization');
+      return;
+    }
+    
+    _videoController?.dispose();
+    
+    // Validate and parse stream URL
+    try {
       final streamUri = Uri.parse(_streamUrl!);
+      
+      // Validate URL format
+      if (streamUri.scheme != 'http' && streamUri.scheme != 'https') {
+        print('Invalid stream URL scheme: ${streamUri.scheme}');
+        return;
+      }
+      
       print('Initializing video player with URL: $_streamUrl (attempt ${_retryCount + 1}/$_maxRetries)');
       
       // For MJPEG streams from ESP32-CAM
@@ -529,46 +659,61 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
         httpHeaders: {
           'Connection': 'keep-alive',
           'Cache-Control': 'no-cache',
-          'Accept': '*/*',
+          'Accept': 'multipart/x-mixed-replace; boundary=--jpgboundary, image/jpeg, */*',
+          'User-Agent': 'Saarthi-App/1.0',
         },
         videoPlayerOptions: VideoPlayerOptions(
           allowBackgroundPlayback: true,
+          mixWithOthers: false,
         ),
       );
       
-      _videoController!.initialize().then((_) {
-        if (mounted) {
+      // Set timeout for initialization (15 seconds)
+      _videoController!.initialize().timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          print('Video player initialization timeout after 15 seconds');
+          throw TimeoutException('Video initialization timeout');
+        },
+      ).then((_) {
+        if (mounted && _videoController != null) {
           setState(() {
             _isStreamInitialized = true;
             _retryCount = 0; // Reset retry count on success
           });
           _videoController!.play();
           _videoController!.setLooping(true);
-          print('Video player initialized successfully');
+          print('Video player initialized successfully - Stream is playing');
         }
       }).catchError((error) {
         print('Error initializing video player: $error');
         _retryCount++;
         
+        if (mounted) {
+          setState(() {
+            _isStreamInitialized = false;
+          });
+        }
+        
         // Retry after delay if retries remaining
         if (mounted && _retryCount < _maxRetries) {
-          Future.delayed(const Duration(seconds: 5), () {
-            if (mounted && !_isStreamInitialized && _streamUrl != null) {
-              print('Retrying video player initialization (attempt $_retryCount)...');
+          print('Retrying video player initialization in 3 seconds (attempt $_retryCount/$_maxRetries)...');
+          Future.delayed(const Duration(seconds: 3), () {
+            if (mounted && !_isStreamInitialized && _streamUrl != null && _streamUrl!.isNotEmpty) {
               _initializeVideoPlayer();
             }
           });
         } else {
           // Max retries reached - show error to user
           if (mounted) {
-            setState(() {
-              _isStreamInitialized = false;
-            });
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Stream connection failed. Please check device connection.'),
+                content: Text('Stream connection failed. Please check device connection and IP address.'),
+                backgroundColor: NeonColors.neonPink.withOpacity(0.8),
+                duration: const Duration(seconds: 5),
                 action: SnackBarAction(
                   label: 'Retry',
+                  textColor: Colors.white,
                   onPressed: () {
                     _retryCount = 0;
                     _initializeVideoPlayer();
@@ -579,6 +724,16 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
           }
         }
       });
+    } catch (e) {
+      print('Error parsing stream URL: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Invalid stream URL format: $_streamUrl'),
+            backgroundColor: NeonColors.neonPink.withOpacity(0.8),
+          ),
+        );
+      }
     }
   }
 
@@ -614,11 +769,11 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
           final data = response['data'] as Map<String, dynamic>;
           final payload = data['sensor_payload'] as Map<String, dynamic>?;
           
-          // Check for obstacle alert - Alert for 50-100cm range
+          // Check for obstacle alert - Alert for 20cm range and 50-100cm range
           if (data['event_type'] == 'OBSTACLE_ALERT' && payload != null) {
             final distance = payload['distance'] as double?;
             
-            // Alert logic: 50-100cm = alert, 10-30cm = no alert
+            // Alert logic: 20cm range = alert, 50-100cm = alert
             if (distance != null && distance > 0) {
               final shouldAlert = _shouldAlertObstacle(distance);
               
@@ -629,53 +784,40 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                 // Different messages based on distance
                 if (distance < 10) {
                   await _voiceAssistant.speak("Critical! Obstacle very close! बहुत करीब बाधा! सावधान!");
+                } else if (distance >= 20 && distance <= 30) {
+                  await _voiceAssistant.speak("Warning! Obstacle detected at 20cm! 20 सेमी पर बाधा का पता चला!");
                 } else if (distance >= 50 && distance <= 100) {
                   await _voiceAssistant.speak("Obstacle detected ahead. बाधा का पता चला।");
                 }
                 
-                // Always start audio recording when obstacle is detected (ESP32 external mic)
-                // Note: Recording uses ESP32's external microphone, not phone's mic
-                if (!_audioRecorder.isRecording) {
-                  // Get event ID from the event data
-                  final eventId = data['id'] as int?;
-                  if (eventId != null) {
-                    _audioRecorder.setEventId(eventId);
-                  }
-                  
-                  await _audioRecorder.startRecording();
-                  print('Audio recording started for obstacle at ${distance}cm, event_id: $eventId');
-                  // Stop recording after 10 seconds and upload
-                  Future.delayed(const Duration(seconds: 10), () async {
-                    if (_audioRecorder.isRecording) {
-                      await _audioRecorder.stopRecording(eventId: eventId);
-                      print('Audio recording stopped and uploaded after 10 seconds');
-                    }
-                  });
+                // Send alert to dashboard via API
+                try {
+                  await apiClient.post(
+                    '/device/emergencyAlert.php',
+                    {
+                      'event_type': 'OBSTACLE_ALERT',
+                      'device_id': _device?.deviceId,
+                      'distance': distance,
+                      'severity': distance < 10 ? 'CRITICAL' : (distance >= 20 && distance <= 30 ? 'HIGH' : 'MEDIUM'),
+                    },
+                    requireAuth: true,
+                  );
+                  print('Obstacle alert sent to dashboard: ${distance}cm');
+                } catch (e) {
+                  print('Error sending obstacle alert to dashboard: $e');
                 }
+                
+                // Audio recording is handled by ESP32-CAM external microphone
+                // No need to record from phone - ESP32 will record and upload automatically
+                print('Obstacle detected - ESP32 will record audio from external microphone');
               }
             }
           }
           
-          // Check for trigger_audio_recording flag from backend
-          // Note: Recording uses ESP32's external microphone, not phone's mic
+          // Audio recording is handled by ESP32-CAM external microphone
+          // Backend flag is informational - ESP32 records automatically on obstacle/emergency
           if (payload != null && payload['trigger_audio_recording'] == true) {
-            if (!_audioRecorder.isRecording) {
-              // Get event ID from the event data
-              final eventId = data['id'] as int?;
-              if (eventId != null) {
-                _audioRecorder.setEventId(eventId);
-              }
-              
-              await _audioRecorder.startRecording();
-              print('Audio recording triggered by backend flag, event_id: $eventId');
-              // Stop recording after 10 seconds and upload
-              Future.delayed(const Duration(seconds: 10), () async {
-                if (_audioRecorder.isRecording) {
-                  await _audioRecorder.stopRecording(eventId: eventId);
-                  print('Audio recording stopped and uploaded');
-                }
-              });
-            }
+            print('Audio recording will be handled by ESP32 external microphone');
           }
         }
       } catch (e) {
@@ -702,10 +844,12 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
   }
   
   bool _shouldAlertObstacle(double distance) {
-    // User requirement: Alert for 50-100cm, NO alert for 10-30cm
+    // User requirement: Alert for 20cm range AND 50-100cm range
     
-    // Alert for 50-100cm range OR very close (<10cm)
-    if ((distance >= 50 && distance <= 100) || distance < 10) {
+    // Alert for 20-30cm range OR 50-100cm range OR very close (<10cm)
+    if ((distance >= 20 && distance <= 30) || 
+        (distance >= 50 && distance <= 100) || 
+        distance < 10) {
       // Don't alert if recently alerted (10 second cooldown)
       if (_lastObstacleAlertTime != null) {
         final timeSinceLastAlert = DateTime.now().difference(_lastObstacleAlertTime!);
@@ -726,8 +870,8 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
       return true;
     }
     
-    // NO alert for 10-30cm range (user requirement)
-    if (distance >= 10 && distance <= 30) {
+    // NO alert for 10-20cm range (too close, might be false positive)
+    if (distance >= 10 && distance < 20) {
       return false;
     }
     

@@ -9,7 +9,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'device_service.dart';
 import 'smart_ai_service.dart';
 import 'wake_word_service.dart';
-import 'audio_recording_service.dart';
+// AudioRecordingService import removed - phone microphone recording is DISABLED
 import 'phone_control_service.dart';
 
 class VoiceAssistantService {
@@ -21,7 +21,8 @@ class VoiceAssistantService {
   final DeviceService _deviceService = DeviceService();
   final SmartAIService _smartAI = SmartAIService();
   final WakeWordService _wakeWordService = WakeWordService();
-  final AudioRecordingService _audioRecorder = AudioRecordingService();
+  // AudioRecordingService removed - phone microphone recording is DISABLED
+  // ESP32-CAM handles all audio recording via external microphone
   final PhoneControlService _phoneControl = PhoneControlService();
   
   bool _isListening = false;
@@ -81,13 +82,19 @@ class VoiceAssistantService {
   }
 
   void _startWakeWordListening() {
+    // Only listen for wake word "saarthi" - do NOT start continuous listening
     _wakeWordService.startListening(
       onWakeWordDetected: () {
-        print('Wake word detected - listening for command...');
+        print('Wake word "saarthi" detected - activating voice assistant...');
+        
+        // Stop wake word listening temporarily while processing command
+        _wakeWordService.stopListening();
         
         // Speak acknowledgment
         speak("Yes, I'm listening. How can I help you?").then((_) {
           // Start listening for command after acknowledgment
+          // NOTE: This uses phone microphone ONLY for command recognition
+          // Audio recording for events/emergencies is handled by ESP32-CAM external microphone
           Future.delayed(const Duration(milliseconds: 500), () {
             startListening(onResult: (command) {
               if (command.trim().isNotEmpty && 
@@ -97,60 +104,33 @@ class VoiceAssistantService {
                 _processCommand(command);
               } else {
                 print('Ignoring wake word as command: $command');
-                // Restart listening
-                Future.delayed(const Duration(seconds: 1), () {
-                  _startWakeWordListening();
-                });
               }
+              // After command processing, restart wake word listening (wait for "saarthi" again)
+              Future.delayed(const Duration(seconds: 1), () {
+                _startWakeWordListening();
+              });
             });
           });
         });
       },
     );
     
-    // Also start continuous listening mode for background operation
-    _startContinuousListening();
+    // DO NOT start continuous listening - only listen after wake word "saarthi" is detected
+    // _startContinuousListening(); // DISABLED - only activate on wake word
   }
   
-  bool _isContinuousListeningActive = false;
-  Timer? _continuousListeningTimer;
+  // DISABLED: Continuous listening removed - only activate on wake word "saarthi"
+  // bool _isContinuousListeningActive = false;
+  // Timer? _continuousListeningTimer;
   
-  void _startContinuousListening() {
-    // Prevent multiple instances
-    if (_isContinuousListeningActive) return;
-    _isContinuousListeningActive = true;
-    
-    // Cancel any existing timer
-    _continuousListeningTimer?.cancel();
-    
-    // Keep listening in background - restart after each command
-    _continuousListeningTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (!_isInitialized) {
-        timer.cancel();
-        _isContinuousListeningActive = false;
-        return;
-      }
-      
-      if (!_isListening) {
-        startListening(onResult: (command) {
-          // Only process if command is not empty and not "ai_response"
-          final trimmedCommand = command.trim().toLowerCase();
-          if (trimmedCommand.isNotEmpty && 
-              trimmedCommand != 'ai_response' && 
-              trimmedCommand != 'error' &&
-              !trimmedCommand.contains('error')) {
-            _processCommand(command);
-          } else {
-            print('Ignoring invalid command: $command');
-          }
-        });
-      }
-    });
-  }
+  // void _startContinuousListening() {
+  //   // DISABLED - only listen after wake word "saarthi" is detected
+  // }
   
   void _stopContinuousListening() {
-    _continuousListeningTimer?.cancel();
-    _isContinuousListeningActive = false;
+    // Cleanup function kept for compatibility
+    // _continuousListeningTimer?.cancel();
+    // _isContinuousListeningActive = false;
   }
 
   /// Speak text with TTS (auto-detect language)
@@ -168,7 +148,8 @@ class VoiceAssistantService {
     await _tts.speak(text);
   }
 
-  /// Start listening for voice commands
+  /// Start listening for voice commands (ONLY called after wake word "saarthi" is detected)
+  /// DO NOT call this directly - it should only be triggered by wake word detection
   Future<void> startListening({Function(String)? onResult}) async {
     try {
       if (!_isInitialized) {
@@ -185,7 +166,9 @@ class VoiceAssistantService {
       _onCommandRecognized = onResult;
       _isListening = true;
       
-      print('Starting speech recognition...');
+      print('Starting speech recognition (after wake word)...');
+      // NOTE: This uses phone microphone ONLY for command recognition after wake word
+      // Audio recording for events is handled by ESP32-CAM external microphone
       await _stt.listen(
         onResult: (result) {
           print('Speech recognition result: ${result.recognizedWords} (final: ${result.finalResult})');
@@ -197,6 +180,10 @@ class VoiceAssistantService {
             if (_onCommandRecognized != null) {
               _onCommandRecognized!(command);
             }
+            // After processing command, restart wake word listening (not continuous listening)
+            Future.delayed(const Duration(seconds: 1), () {
+              _startWakeWordListening();
+            });
           }
         },
         listenFor: const Duration(seconds: 10), // Increased timeout
@@ -207,11 +194,9 @@ class VoiceAssistantService {
     } catch (e) {
       print('Error starting speech recognition: $e');
       _isListening = false;
-      // Retry after delay
+      // Restart wake word listening on error (not continuous listening)
       Future.delayed(const Duration(seconds: 2), () {
-        if (!_isListening) {
-          startListening(onResult: onResult);
-        }
+        _startWakeWordListening();
       });
     }
   }
@@ -221,7 +206,7 @@ class VoiceAssistantService {
   Future<void> stopListening() async {
     await _stt.stop();
     _isListening = false;
-    _stopContinuousListening();
+    _stopContinuousListening(); // Stop any continuous listening if active
   }
   
   /// Dispose and cleanup
@@ -389,9 +374,19 @@ class VoiceAssistantService {
   }
 
   Future<void> _handleCallCommand(String command) async {
+    print('Processing call command: $command');
+    
     // Request permissions first
-    if (!await _phoneControl.hasPermissions()) {
+    final hasPermissions = await _phoneControl.hasPermissions();
+    if (!hasPermissions) {
+      print('Requesting phone permissions...');
       await _phoneControl.requestPermissions();
+      // Check again after requesting
+      final hasPermissionsAfter = await _phoneControl.hasPermissions();
+      if (!hasPermissionsAfter) {
+        await speak("Please grant phone permissions to make calls.");
+        return;
+      }
     }
     
     // Extract phone number or contact name (Hindi + English)
@@ -402,8 +397,10 @@ class VoiceAssistantService {
       final phone = phoneMatch.group(0)!;
       await speak(_getResponse('calling', phone));
       final success = await _phoneControl.makeCall(phone);
-      if (!success!) {
+      if (success == null || !success) {
         await speak(_getResponse('call_failed'));
+      } else {
+        print('Call initiated successfully to $phone');
       }
     } else {
       // Try to extract contact name (Hindi + English patterns) - handle multi-word names
@@ -565,13 +562,9 @@ class VoiceAssistantService {
   }
 
   Future<void> _handleRecordCommand() async {
-    if (_audioRecorder.isRecording) {
-      await _audioRecorder.stopRecording();
-      await speak("Recording stopped and saved.");
-    } else {
-      await _audioRecorder.startRecording();
-      await speak("Recording started. Say stop recording when done.");
-    }
+    // Phone microphone recording is DISABLED
+    // ESP32-CAM handles all audio recording via external microphone
+    await speak("Audio recording is handled by your ESP32-CAM device. It will automatically record during events and emergencies. Phone microphone is not used for recording.");
     _onCommandRecognized?.call("record");
   }
 
@@ -612,6 +605,8 @@ class VoiceAssistantService {
 
   /// Handle open app command
   Future<void> _handleOpenAppCommand(String command) async {
+    print('Processing open app command: $command');
+    
     // Extract app name (Hindi + English) - improved pattern matching
     String? appName;
     

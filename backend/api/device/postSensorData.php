@@ -110,15 +110,20 @@ if ($distance > 0) {
     $stmt->execute([$userId, $deviceDbId]);
     $recentAlert = $stmt->fetch();
     
-    // Alert logic: 50-100cm = alert, 10-30cm = no alert
+    // Alert logic: 20cm range = alert, 50-100cm = alert
     $shouldAlert = false;
     if ($distance >= 50 && $distance <= 100) {
         // Alert for far objects (50-100cm)
         if (!$recentAlert) {
             $shouldAlert = true;
         }
-    } else if ($distance >= 10 && $distance <= 30) {
-        // NO alert for close objects (10-30cm) - user requirement
+    } else if ($distance >= 20 && $distance <= 30) {
+        // Alert for 20cm range objects - user requirement
+        if (!$recentAlert) {
+            $shouldAlert = true;
+        }
+    } else if ($distance >= 10 && $distance < 20) {
+        // NO alert for 10-20cm range (too close, might be false positive)
         $shouldAlert = false;
     } else if ($distance > 100) {
         // No alert for very far objects
@@ -133,6 +138,8 @@ if ($distance > 0) {
         // Severity based on distance
         if ($distance < 10) {
             $severity = 'CRITICAL';
+        } else if ($distance >= 20 && $distance <= 30) {
+            $severity = 'HIGH'; // 20cm range is high priority
         } else if ($distance >= 50 && $distance <= 100) {
             $severity = 'MEDIUM';
         } else {

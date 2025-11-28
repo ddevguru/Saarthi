@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/app_theme.dart';
 import '../../../data/services/api_client.dart';
+import '../../../data/services/auth_service.dart';
 import 'child_detail_screen.dart';
 import 'package:saarthi/l10n/app_localizations.dart';
 
@@ -18,6 +19,7 @@ class ParentHomeScreen extends StatefulWidget {
 
 class _ParentHomeScreenState extends State<ParentHomeScreen> {
   final ApiClient _apiClient = ApiClient();
+  final AuthService _authService = AuthService();
   List<Map<String, dynamic>> _children = [];
   bool _isLoading = true;
   String? _errorMessage;
@@ -95,6 +97,134 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
     return '${diff.inDays} days ago';
   }
 
+  Future<void> _handleLogout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Logout', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await _authService.logout();
+      if (mounted) {
+        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+      }
+    }
+  }
+
+  void _showAddChildDialog() {
+    final phoneController = TextEditingController();
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Add Child'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Enter the phone number of the child account to link.',
+                style: TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Phone Number',
+                  hintText: 'Enter 10-digit phone number',
+                  prefixIcon: Icon(Icons.phone),
+                  border: OutlineInputBorder(),
+                ),
+                maxLength: 15,
+              ),
+              if (isLoading)
+                const Padding(
+                  padding: EdgeInsets.only(top: 16),
+                  child: CircularProgressIndicator(),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading
+                  ? null
+                  : () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      final phone = phoneController.text.trim();
+                      if (phone.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please enter a phone number'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+
+                      setDialogState(() {
+                        isLoading = true;
+                      });
+
+                      try {
+                        final response = await _apiClient.post(
+                          '/parent/addChild.php',
+                          {'child_phone': phone},
+                          requireAuth: true,
+                        );
+
+                        if (mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(response['message'] ?? 'Child added successfully'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                          // Refresh children list
+                          _loadChildren();
+                        }
+                      } catch (e) {
+                        setDialogState(() {
+                          isLoading = false;
+                        });
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(e.toString().replaceAll('Exception: ', '')),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              child: const Text('Add'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -108,6 +238,25 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
             onPressed: () {
               Navigator.pushNamed(context, '/notifications');
             },
+          ),
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              if (value == 'logout') {
+                await _handleLogout();
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    const Icon(Icons.logout, color: Colors.red),
+                    const SizedBox(width: 8),
+                    Text(l10n.logout),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -219,10 +368,7 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
                   ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          // TODO: Add child functionality
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Add child feature coming soon')),
-          );
+          _showAddChildDialog();
         },
         icon: const Icon(Icons.person_add),
         label: const Text('Add Child'),

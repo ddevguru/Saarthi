@@ -15,6 +15,8 @@ class AppConstants {
   static const String latestSensorDataEndpoint = '/device/getLatestSensorData.php';
   static const String locationUpdateEndpoint = '/location/update.php';
   static const String childDashboardEndpoint = '/parent/childDashboardData.php';
+  static const String listChildrenEndpoint = '/parent/listChildren.php';
+  static const String addChildEndpoint = '/parent/addChild.php';
   static const String createSafeZoneEndpoint = '/parent/createSafeZone.php';
   static const String createTripEndpoint = '/parent/createTrip.php';
   static const String generateDeviceTokenEndpoint = '/device/generateToken.php';

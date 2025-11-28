@@ -5,7 +5,6 @@
  */
 
 import 'dart:io';
-import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:record/record.dart';
 import 'package:http/http.dart' as http;
@@ -28,7 +27,16 @@ class AudioRecordingService {
   }
 
   /// Start audio recording
+  /// NOTE: DISABLED - Phone microphone recording is NOT used
+  /// All audio recording is handled by ESP32-CAM external microphone
+  /// This function is kept for compatibility but does not record from phone
   Future<String?> startRecording() async {
+    // DISABLED: Phone microphone recording is not used
+    // ESP32-CAM handles all audio recording via external microphone
+    print('Phone microphone recording is DISABLED. ESP32-CAM will handle audio recording.');
+    return null;
+    
+    /* DISABLED CODE - Phone recording not used
     if (_isRecording) {
       return _currentRecordingPath;
     }
@@ -70,6 +78,7 @@ class AudioRecordingService {
       print('Error starting recording: $e');
       return null;
     }
+    */
   }
 
   /// Stop audio recording and upload to backend

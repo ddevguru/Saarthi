@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
+import '../../core/neon_colors.dart';
 import 'package:saarthi/l10n/app_localizations.dart';
 
 class DeviceStatusCard extends StatelessWidget {
@@ -38,16 +39,21 @@ class DeviceStatusCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(
                   l10n.deviceStatus,
-                  style: Theme.of(context).textTheme.titleLarge,
+                  style: NeonColors.neonText(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: connected ? NeonColors.lightNeonGreen : NeonColors.lightNeonPink,
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
             Text(
               connected ? l10n.connected : l10n.disconnected,
-              style: TextStyle(
-                color: connected ? AppTheme.secondaryColor : AppTheme.dangerColor,
+              style: NeonColors.neonText(
+                fontSize: 16,
                 fontWeight: FontWeight.bold,
+                color: connected ? NeonColors.lightNeonGreen : NeonColors.lightNeonPink,
               ),
             ),
             if (lastEvent != null) ...[

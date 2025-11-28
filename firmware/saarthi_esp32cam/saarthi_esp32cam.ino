@@ -15,8 +15,8 @@
 // ============================================
 // CONFIGURATION
 // ============================================
-const char* WIFI_SSID = "Krishna";
-const char* WIFI_PASSWORD = "radhakrishna1";
+const char* WIFI_SSID = "CMF";
+const char* WIFI_PASSWORD = "Nothing2";
 const char* BACKEND_SERVER_HOST = "devloperwala.in";
 const int BACKEND_SERVER_PORT = 443; // HTTPS
 const char* DEVICE_ID = "ESP32_CAM_001"; // Change per device
@@ -353,6 +353,9 @@ void triggerSOS(String gestureType) {
     if (DEBUG_SENSORS) Serial.println("SOS photo captured and sent with event_id: " + eventId);
   }
   
+  // Record audio from ESP32 external microphone (5 seconds)
+  recordAndSendAudio(eventId, 5000);
+  
   // Blink LED
   for (int i = 0; i < 5; i++) {
     digitalWrite(LED_PIN, HIGH);
@@ -392,6 +395,9 @@ void triggerObstacleAlert(float distance) {
     if (DEBUG_SENSORS) Serial.println("Photo captured and sent to backend with event_id: " + eventId);
   }
   
+  // Record audio from ESP32 external microphone (5 seconds)
+  recordAndSendAudio(eventId, 5000);
+  
   // Haptic feedback (LED blink)
   digitalWrite(LED_PIN, HIGH);
   delay(50);
@@ -418,6 +424,7 @@ void triggerLoudSoundAlert(int micValue) {
 
 // Forward declarations
 void sendSnapshotToBackend(camera_fb_t * fb, String eventId = "");
+void recordAndSendAudio(String eventId, int durationMs = 5000);
 
 void sendSensorDataToBackend(float distance, bool touched, int micRaw) {
   if (WiFi.status() != WL_CONNECTED) {
@@ -597,6 +604,125 @@ void sendSnapshotToBackend(camera_fb_t * fb, String eventId) {
   }
   
   client.stop();
+}
+
+void recordAndSendAudio(String eventId, int durationMs) {
+  if (WiFi.status() != WL_CONNECTED) return;
+  
+  if (DEBUG_SENSORS) Serial.println("Recording audio from ESP32 external microphone...");
+  
+  // Sample rate: 8kHz (8000 samples per second)
+  // 16-bit samples (2 bytes per sample)
+  // Duration: durationMs milliseconds
+  int sampleRate = 8000;
+  int samplesNeeded = (sampleRate * durationMs) / 1000;
+  int maxSamples = 4000; // Limit to ~0.5 seconds to avoid memory issues (8KB)
+  if (samplesNeeded > maxSamples) samplesNeeded = maxSamples;
+  
+  // Allocate buffer for audio samples (16-bit = 2 bytes per sample)
+  uint8_t* audioBuffer = (uint8_t*)malloc(samplesNeeded * 2);
+  if (!audioBuffer) {
+    if (DEBUG_SENSORS) Serial.println("Failed to allocate audio buffer");
+    return;
+  }
+  
+  // Configure ADC for microphone
+  analogReadResolution(12); // 12-bit ADC (0-4095)
+  analogSetPinAttenuation(MIC_PIN, ADC_11db); // 0-3.3V range
+  
+  // Record audio samples
+  unsigned long startTime = millis();
+  int sampleIndex = 0;
+  int sampleInterval = 1000000 / sampleRate; // microseconds between samples
+  
+  while (sampleIndex < samplesNeeded && (millis() - startTime) < durationMs) {
+    // Read analog value (0-4095)
+    int adcValue = analogRead(MIC_PIN);
+    
+    // Convert 12-bit ADC (0-4095) to 16-bit signed integer (-32768 to 32767)
+    // Center at 2048 (midpoint), scale to 16-bit range
+    int16_t sample = ((adcValue - 2048) * 32767) / 2048;
+    
+    // Store as little-endian 16-bit
+    audioBuffer[sampleIndex * 2] = sample & 0xFF;
+    audioBuffer[sampleIndex * 2 + 1] = (sample >> 8) & 0xFF;
+    
+    sampleIndex++;
+    delayMicroseconds(sampleInterval);
+  }
+  
+  if (DEBUG_SENSORS) Serial.printf("Recorded %d audio samples\n", sampleIndex);
+  
+  // Send audio to backend
+  WiFiClientSecure client;
+  client.setInsecure();
+  client.setTimeout(20000);
+  
+  if (!client.connect(BACKEND_SERVER_HOST, BACKEND_SERVER_PORT)) {
+    if (DEBUG_HTTP) Serial.println("Connection to server failed for audio upload");
+    free(audioBuffer);
+    return;
+  }
+  
+  // Create multipart form data
+  String boundary = "----WebKitFormBoundaryAudio";
+  
+  String bodyHeader = "--" + boundary + "\r\n";
+  bodyHeader += "Content-Disposition: form-data; name=\"device_id\"\r\n\r\n";
+  bodyHeader += String(DEVICE_ID) + "\r\n";
+  
+  if (eventId.length() > 0) {
+    bodyHeader += "--" + boundary + "\r\n";
+    bodyHeader += "Content-Disposition: form-data; name=\"event_id\"\r\n\r\n";
+    bodyHeader += eventId + "\r\n";
+  }
+  
+  bodyHeader += "--" + boundary + "\r\n";
+  bodyHeader += "Content-Disposition: form-data; name=\"audio\"; filename=\"audio.raw\"\r\n";
+  bodyHeader += "Content-Type: application/octet-stream\r\n\r\n";
+  
+  String bodyFooter = "\r\n--" + boundary + "--\r\n";
+  
+  int audioDataSize = sampleIndex * 2;
+  int totalSize = bodyHeader.length() + audioDataSize + bodyFooter.length();
+  
+  // Send HTTP POST request
+  String request = "POST /saarthi/api/device/uploadAudioFromESP32.php HTTP/1.1\r\n";
+  request += "Host: " + String(BACKEND_SERVER_HOST) + "\r\n";
+  request += "Content-Type: multipart/form-data; boundary=" + boundary + "\r\n";
+  request += "Content-Length: " + String(totalSize) + "\r\n";
+  request += "Connection: close\r\n\r\n";
+  
+  client.print(request);
+  client.print(bodyHeader);
+  client.write(audioBuffer, audioDataSize);
+  client.print(bodyFooter);
+  
+  // Wait for response
+  unsigned long timeout = millis();
+  while (client.available() == 0) {
+    if (millis() - timeout > 20000) {
+      if (DEBUG_HTTP) Serial.println("Audio upload timeout");
+      client.stop();
+      free(audioBuffer);
+      return;
+    }
+  }
+  
+  // Read response
+  String response = "";
+  while (client.available()) {
+    response += client.readStringUntil('\r');
+  }
+  
+  if (DEBUG_HTTP) {
+    Serial.println("Audio upload response: " + response);
+  }
+  
+  client.stop();
+  free(audioBuffer);
+  
+  if (DEBUG_SENSORS) Serial.println("Audio recorded and uploaded successfully");
 }
 
 void syncThresholdsFromBackend() {
@@ -1122,8 +1248,6 @@ void setup() {
   analogReadResolution(12); // 0-4095
   analogSetAttenuation(ADC_11db); // 0-3.3V
   analogSetPinAttenuation(MIC_PIN, ADC_11db);
-  // Set ADC width to 12 bits for better resolution
-  analogSetWidth(12);
 
   // Connect WiFi
   Serial.print("Connecting to WiFi: ");
