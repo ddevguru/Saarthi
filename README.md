@@ -28,7 +28,7 @@
 > - `![ScreentShot](assets/images/3.jpeg)` - For video thumbnails
 
 **📹 Demo Videos:** 
-- [Watch Full Demo](#) - *Add your YouTube/Vimeo link here (e.g., [https://youtube.com/watch?v=VIDEO_ID](https://youtu.be/mEKKtl-lIlc))*
+- [Watch Full Demo](#) - (https://youtu.be/mEKKtl-lIlc))*
 
 
 **🖼️ Screenshots:**
