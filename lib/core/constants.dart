@@ -16,6 +16,7 @@ class AppConstants {
   static const String locationUpdateEndpoint = '/location/update.php';
   static const String childDashboardEndpoint = '/parent/childDashboardData.php';
   static const String listChildrenEndpoint = '/parent/listChildren.php';
+  static const String listAvailableChildrenEndpoint = '/parent/listAvailableChildren.php';
   static const String addChildEndpoint = '/parent/addChild.php';
   static const String createSafeZoneEndpoint = '/parent/createSafeZone.php';
   static const String createTripEndpoint = '/parent/createTrip.php';
@@ -59,5 +60,6 @@ class AppConstants {
   static const String prefUserRole = 'user_role';
   static const String prefLanguage = 'language_preference';
   static const String prefDeviceId = 'device_id';
+  static const String prefManualStreamUrl = 'manual_stream_url'; // Manual stream URL override (highest priority)
 }
 

@@ -13,6 +13,7 @@
         <domain includeSubdomains="true">192.168.0.106</domain>
         <domain includeSubdomains="true">192.168.0.0</domain>
         <domain includeSubdomains="true">10.0.0.0</domain>
+        <domain includeSubdomains="true">10.39.0.0</domain>
         <domain includeSubdomains="true">172.16.0.0</domain>
         <domain includeSubdomains="true">localhost</domain>
         <domain includeSubdomains="true">127.0.0.1</domain>

@@ -31,33 +31,16 @@ class NeonColors {
   // Neon Purple
   static const Color neonPurple = Color(0xFF9900FF);
   
-  // Text with neon glow effect
+  // Simple neon text - no shadows, just clean color
   static TextStyle neonText({
     required double fontSize,
     FontWeight fontWeight = FontWeight.bold,
-    Color color = neonPink,
+    Color color = lightNeonPink,
   }) {
     return TextStyle(
       fontSize: fontSize,
       fontWeight: fontWeight,
       color: color,
-      shadows: [
-        Shadow(
-          color: color.withOpacity(0.8),
-          blurRadius: 10,
-          offset: const Offset(0, 0),
-        ),
-        Shadow(
-          color: color.withOpacity(0.6),
-          blurRadius: 20,
-          offset: const Offset(0, 0),
-        ),
-        Shadow(
-          color: color.withOpacity(0.4),
-          blurRadius: 30,
-          offset: const Offset(0, 0),
-        ),
-      ],
     );
   }
   

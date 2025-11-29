@@ -74,8 +74,11 @@ class VoiceAssistantService {
       // Initialize wake word service
       await _wakeWordService.initialize();
       
-      // Start listening for wake word
-      _startWakeWordListening();
+      // Auto-start wake word listening so "hey sarthi" or "sarthi" can activate voice commands
+      // Delay to ensure initialization is complete
+      Future.delayed(const Duration(seconds: 2), () {
+        _startWakeWordListening();
+      });
     } finally {
       _isInitializing = false;
     }
@@ -253,6 +256,12 @@ class VoiceAssistantService {
       return;
     }
     
+    // Camera command (Hindi + English) - Check BEFORE open app
+    if (_matchesPattern(lowerCommand, ['camera', 'photo', 'picture', 'capture', 'click', 'कैमरा', 'फोटो', 'तस्वीर', 'खींचो'])) {
+      _handleCameraCommand();
+      return;
+    }
+    
     // Open app (Hindi + English) - Check this FIRST before other commands
     if (_matchesPattern(lowerCommand, ['open', 'launch', 'start', 'खोलें', 'एप', 'शुरू', 'चलाएं', 'खोलो'])) {
       _handleOpenAppCommand(command);
@@ -266,7 +275,7 @@ class VoiceAssistantService {
     }
     
     // Send message/WhatsApp (Hindi + English)
-    if (_matchesPattern(lowerCommand, ['message', 'whatsapp', 'send', 'text', 'मैसेज', 'संदेश', 'भेजें', 'भेजो'])) {
+    if (_matchesPattern(lowerCommand, ['message', 'whatsapp', 'send', 'text', 'मैसेज', 'संदेश', 'भेजें', 'भेजो', 'व्हाट्सऐप'])) {
       _handleMessageCommand(command);
       return;
     }
@@ -469,6 +478,8 @@ class VoiceAssistantService {
       await _phoneControl.requestPermissions();
     }
     
+    final lowerCommand = command.toLowerCase();
+    
     // Extract contact name or phone number
     final phoneRegex = RegExp(r'\d{10,}');
     final phoneMatch = phoneRegex.firstMatch(command);
@@ -526,30 +537,44 @@ class VoiceAssistantService {
     }
     
     if (phoneNumber != null && phoneNumber.isNotEmpty) {
-      await speak(_getResponse('sending_message', contactName ?? phoneNumber));
-      // Extract message text if provided
-      String message = _getResponse('default_message');
+      // Check if command contains "whatsapp" - use WhatsApp instead of SMS
+      final isWhatsApp = lowerCommand.contains('whatsapp') || lowerCommand.contains('व्हाट्सऐप');
       
-      // Try to extract message after contact name
-      if (contactName != null) {
-        final messageMatch = RegExp(r'$contactName\s+(.+?)(?:\s|$)', caseSensitive: false).firstMatch(command);
-        if (messageMatch != null) {
-          message = messageMatch.group(1)?.trim() ?? message;
+      if (isWhatsApp) {
+        // Open WhatsApp with contact
+        await speak("Opening WhatsApp for ${contactName ?? phoneNumber}. ${contactName ?? phoneNumber} के लिए व्हाट्सऐप खोल रहे हैं।");
+        final success = await _phoneControl.openWhatsApp(phoneNumber);
+        if (success) {
+          await speak("WhatsApp opened. व्हाट्सऐप खोला गया।");
         } else {
-          // Try colon separator
-          final colonMatch = RegExp(r':\s*(.+)', caseSensitive: false).firstMatch(command);
-          if (colonMatch != null) {
-            message = colonMatch.group(1)?.trim() ?? message;
+          await speak("Failed to open WhatsApp. Please try again. व्हाट्सऐप खोलने में विफल।");
+        }
+      } else {
+        await speak(_getResponse('sending_message', contactName ?? phoneNumber));
+        // Extract message text if provided
+        String message = _getResponse('default_message');
+        
+        // Try to extract message after contact name
+        if (contactName != null) {
+          final messageMatch = RegExp(r'$contactName\s+(.+?)(?:\s|$)', caseSensitive: false).firstMatch(command);
+          if (messageMatch != null) {
+            message = messageMatch.group(1)?.trim() ?? message;
+          } else {
+            // Try colon separator
+            final colonMatch = RegExp(r':\s*(.+)', caseSensitive: false).firstMatch(command);
+            if (colonMatch != null) {
+              message = colonMatch.group(1)?.trim() ?? message;
+            }
           }
         }
-      }
-      
-      print('Sending message to $phoneNumber: $message');
-      final success = await _phoneControl.sendSMS(phoneNumber, message);
-      if (success) {
-        await speak(_getResponse('message_sent'));
-      } else {
-        await speak(_getResponse('message_failed'));
+        
+        print('Sending message to $phoneNumber: $message');
+        final success = await _phoneControl.sendSMS(phoneNumber, message);
+        if (success) {
+          await speak(_getResponse('message_sent'));
+        } else {
+          await speak(_getResponse('message_failed'));
+        }
       }
     } else {
       if (contactName != null && contactName.isNotEmpty) {
@@ -665,6 +690,18 @@ class VoiceAssistantService {
     _onCommandRecognized?.call("settings");
   }
 
+  /// Handle camera command
+  Future<void> _handleCameraCommand() async {
+    await speak("Opening camera. कैमरा खोल रहे हैं।");
+    final success = await _phoneControl.openApp('camera');
+    if (success) {
+      await speak("Camera opened successfully. कैमरा सफलतापूर्वक खोला गया।");
+    } else {
+      await speak("Failed to open camera. Please try again. कैमरा खोलने में विफल।");
+    }
+    _onCommandRecognized?.call("camera");
+  }
+
   /// Get response in Hindi or English based on command language
   String _getResponse(String key, [String? param]) {
     // Detect if command contains Hindi characters
@@ -687,6 +724,9 @@ class VoiceAssistantService {
       'app_help': {'en': 'Please tell me which app to open', 'hi': 'कृपया बताएं कौन सी एप खोलनी है'},
       'opening_settings': {'en': 'Opening settings', 'hi': 'सेटिंग्स खोल रहे हैं'},
       'default_message': {'en': 'Message from SAARTHI', 'hi': 'SAARTHI से संदेश'},
+      'opening_camera': {'en': 'Opening camera', 'hi': 'कैमरा खोल रहे हैं'},
+      'camera_opened': {'en': 'Camera opened successfully', 'hi': 'कैमरा सफलतापूर्वक खोला गया'},
+      'camera_failed': {'en': 'Failed to open camera', 'hi': 'कैमरा खोलने में विफल'},
     };
     
     final response = responses[key];

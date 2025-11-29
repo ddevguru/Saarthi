@@ -22,12 +22,6 @@ class VoiceAssistantButton extends StatefulWidget {
 class _VoiceAssistantButtonState extends State<VoiceAssistantButton> {
   bool _isListening = false;
 
-  @override
-  void initState() {
-    super.initState();
-    widget.voiceAssistant.initialize();
-  }
-
   Future<void> _toggleListening() async {
     if (_isListening) {
       await widget.voiceAssistant.stopListening();
@@ -35,9 +29,17 @@ class _VoiceAssistantButtonState extends State<VoiceAssistantButton> {
         _isListening = false;
       });
     } else {
+      // Initialize if not already initialized
+      if (!widget.voiceAssistant.isInitialized) {
+        await widget.voiceAssistant.initialize();
+      }
+      
       setState(() {
         _isListening = true;
       });
+      
+      // Speak acknowledgment and start listening
+      await widget.voiceAssistant.speak("Yes, I'm listening. How can I help you?");
       await widget.voiceAssistant.startListening(
         onResult: (command) {
           setState(() {

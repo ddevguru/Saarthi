@@ -273,6 +273,44 @@ class PhoneControlService {
     }
   }
 
+  /// Open WhatsApp with contact
+  Future<bool> openWhatsApp(String phoneNumber) async {
+    try {
+      // Clean phone number - remove + and spaces
+      String cleanNumber = phoneNumber.replaceAll(RegExp(r'[^\d]'), '');
+      
+      // Remove country code if present (for India, remove 91)
+      if (cleanNumber.length == 12 && cleanNumber.startsWith('91')) {
+        cleanNumber = cleanNumber.substring(2);
+      }
+      
+      // WhatsApp URL format: whatsapp://send?phone=919876543210
+      final uri = Uri.parse('whatsapp://send?phone=$cleanNumber');
+      
+      try {
+        final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+        if (launched) {
+          print('WhatsApp opened successfully for $cleanNumber');
+          return true;
+        }
+      } catch (e) {
+        print('WhatsApp not installed or error: $e');
+        // Fallback: Try opening WhatsApp web or play store
+        try {
+          final webUri = Uri.parse('https://wa.me/$cleanNumber');
+          return await launchUrl(webUri, mode: LaunchMode.externalApplication);
+        } catch (e2) {
+          print('Failed to open WhatsApp web: $e2');
+        }
+      }
+      
+      return false;
+    } catch (e) {
+      print('Error opening WhatsApp: $e');
+      return false;
+    }
+  }
+
   /// Open settings
   Future<bool> openSettings() async {
     try {

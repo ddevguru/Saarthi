@@ -40,8 +40,8 @@ class TouchSensorService {
   }
 
   void _startPolling() {
-    // Poll backend for touch sensor events every 200ms for faster response
-    _pollTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
+    // Poll backend for touch sensor events every 100ms for very fast response
+    _pollTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
       _checkTouchSensor();
     });
   }
@@ -85,8 +85,8 @@ class TouchSensorService {
           print('New touch type detected: $finalTouchType (previous: $_lastProcessedTouchType)');
           _lastProcessedTouchType = finalTouchType;
           _handleTouchType(finalTouchType);
-          // Reset after 3 seconds to allow same type again
-          Future.delayed(const Duration(seconds: 3), () {
+          // Reset after 1 second to allow same type again (faster response for single touch)
+          Future.delayed(const Duration(seconds: 1), () {
             if (_lastProcessedTouchType == finalTouchType) {
               _lastProcessedTouchType = null;
               print('Reset touch type tracking');
@@ -99,6 +99,25 @@ class TouchSensorService {
             print('Touch released, resetting tracking');
             _lastProcessedTouchType = null;
           }
+        }
+        
+        // Also check for immediate single touch detection from state change
+        // This ensures single touch is detected even if backend hasn't processed touch_type yet
+        if (touchState == 1 && _lastTouchState == 0) {
+          // Touch started - mark time
+          _touchStartTime = DateTime.now();
+        } else if (touchState == 0 && _lastTouchState == 1 && _touchStartTime != null) {
+          // Touch released - check if it was a quick single tap
+          final pressDuration = DateTime.now().difference(_touchStartTime!);
+          if (pressDuration < const Duration(milliseconds: 500) && pressDuration > const Duration(milliseconds: 50)) {
+            // Quick tap detected - trigger single tap immediately
+            print('Quick single tap detected from state change');
+            _onSingleTap?.call();
+            _touchStartTime = null;
+            _lastTouchState = touchState;
+            return;
+          }
+          _touchStartTime = null;
         }
         
         // Otherwise, detect from state changes

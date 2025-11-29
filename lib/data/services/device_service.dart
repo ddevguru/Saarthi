@@ -6,6 +6,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/device.dart';
 import 'api_client.dart';
+import '../../core/constants.dart';
 
 class DeviceService {
   final ApiClient _apiClient = ApiClient();
@@ -40,8 +41,13 @@ class DeviceService {
               if (parts.length > 6 && parts[6].isNotEmpty) {
                 streamUrl = parts[6];
               } else if (parts.length > 5 && parts[5].isNotEmpty) {
-                ipAddress = parts[5];
-                streamUrl = 'http://${parts[5]}:81/stream';
+                // Remove trailing dots/spaces from IP address
+                String cleanIp = parts[5].trim();
+                if (cleanIp.endsWith('.')) {
+                  cleanIp = cleanIp.substring(0, cleanIp.length - 1);
+                }
+                ipAddress = cleanIp;
+                streamUrl = 'http://$cleanIp:81/stream';
               }
               
               final device = Device(
@@ -147,13 +153,46 @@ class DeviceService {
   }
 
   /// Build stream URL from device IP or use stored stream_url
-  String? buildStreamUrl(Device? device, String? ipAddress) {
+  /// Priority: Manual URL (SharedPreferences) > Device streamUrl > IP-based URL
+  Future<String?> buildStreamUrl(Device? device, String? ipAddress) async {
+    // First check for manual stream URL (highest priority - user can set this)
+    final prefs = await SharedPreferences.getInstance();
+    final manualStreamUrl = prefs.getString(AppConstants.prefManualStreamUrl);
+    if (manualStreamUrl != null && manualStreamUrl.isNotEmpty) {
+      // Clean the URL: remove trailing dots from host
+      String cleanUrl = manualStreamUrl.trim();
+      try {
+        final uri = Uri.parse(cleanUrl);
+        String cleanHost = uri.host;
+        // Remove trailing dots from host
+        while (cleanHost.endsWith('.')) {
+          cleanHost = cleanHost.substring(0, cleanHost.length - 1);
+        }
+        // Rebuild URL with clean host
+        final cleanUri = uri.replace(host: cleanHost);
+        cleanUrl = cleanUri.toString();
+        print('Using manual stream URL from settings: $cleanUrl');
+        return cleanUrl;
+      } catch (e) {
+        print('Error parsing manual stream URL: $e');
+        // Return original if parsing fails
+        return manualStreamUrl;
+      }
+    }
+    
+    // Second priority: Use stream_url from device if available
     if (device?.streamUrl != null && device!.streamUrl!.isNotEmpty) {
       return device.streamUrl;
     }
     
+    // Third priority: Build from IP address
     if (ipAddress != null && ipAddress.isNotEmpty) {
-      return 'http://$ipAddress:81/stream';
+      // Remove trailing dots/spaces from IP address
+      String cleanIp = ipAddress.trim();
+      if (cleanIp.endsWith('.')) {
+        cleanIp = cleanIp.substring(0, cleanIp.length - 1);
+      }
+      return 'http://$cleanIp:81/stream';
     }
     
     return null;

@@ -10,7 +10,16 @@ session_start();
 require_once __DIR__ . '/../config/database.php';
 date_default_timezone_set('Asia/Kolkata');
 
-if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'ADMIN') {
+// FIX: Prevent redirect loop - check session first, then role
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit;
+}
+
+// FIX: Check role with proper string comparison (case-insensitive)
+$userRole = isset($_SESSION['user_role']) ? strtoupper(trim($_SESSION['user_role'])) : '';
+if ($userRole !== 'ADMIN') {
+    // Always redirect to login.php (NOT users.php) to prevent infinite redirect loop
     header('Location: login.php');
     exit;
 }
@@ -61,8 +70,7 @@ $locations = $stmt->fetchAll();
 
 // Get recent events
 $stmt = $db->prepare("
-    SELECT se.*, d.device_id 
-    SELECT se.id, se.event_type, se.severity, se.created_at, se.image_path, se.audio_path, se.sensor_payload
+    SELECT se.id, se.event_type, se.severity, se.created_at, se.image_path, se.audio_path, se.sensor_payload, d.device_id
     FROM sensor_events se
     LEFT JOIN devices d ON se.device_id = d.id
     WHERE se.user_id = ?
@@ -116,6 +124,10 @@ try {
         }
         .tab-content.active {
             display: block;
+        }
+        /* Ensure details tab is visible by default if no tab is specified */
+        #details.tab-content:not(.active) {
+            display: none;
         }
         .detail-grid {
             display: grid;
@@ -220,7 +232,7 @@ try {
             </div>
 
             <!-- Details Tab -->
-            <div id="details" class="tab-content <?php echo $tab === 'details' ? 'active' : ''; ?>">
+            <div id="details" class="tab-content <?php echo ($tab === 'details' || empty($tab)) ? 'active' : ''; ?>">
                 <div class="detail-grid">
                     <div class="detail-card">
                         <h3>Name</h3>
@@ -478,20 +490,61 @@ try {
             });
             
             // Show selected tab
-            document.getElementById(tabName).classList.add('active');
-            event.target.classList.add('active');
+            const tabContent = document.getElementById(tabName);
+            if (tabContent) {
+                tabContent.classList.add('active');
+            }
+            
+            // Activate the clicked button
+            const clickedButton = event.target;
+            if (clickedButton) {
+                clickedButton.classList.add('active');
+            }
             
             // Update URL
             const url = new URL(window.location);
             url.searchParams.set('tab', tabName);
             window.history.pushState({}, '', url);
+            
+            // Reinitialize map if location tab is opened
+            if (tabName === 'location' && typeof google !== 'undefined' && typeof initMap === 'function') {
+                setTimeout(initMap, 300);
+            }
         }
         
         // Initialize tab on page load
         document.addEventListener('DOMContentLoaded', function() {
-            const tab = '<?php echo $tab; ?>';
-            if (tab) {
-                showTab(tab);
+            // Get tab from URL or default to 'details'
+            const urlParams = new URLSearchParams(window.location.search);
+            const tab = urlParams.get('tab') || '<?php echo $tab; ?>' || 'details';
+            
+            // Hide all tabs first
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            
+            // Show the selected tab
+            const tabContent = document.getElementById(tab);
+            const tabButton = document.querySelector(`button.tab[onclick*="'${tab}'"]`) || 
+                             document.querySelector(`button.tab[onclick*="${tab}"]`);
+            
+            if (tabContent) {
+                tabContent.classList.add('active');
+            }
+            if (tabButton) {
+                tabButton.classList.add('active');
+            }
+            
+            // If no tab found, default to details
+            if (!tabContent || !tabButton) {
+                const detailsTab = document.getElementById('details');
+                const detailsButton = document.querySelector('button.tab[onclick*="details"]');
+                if (detailsTab) detailsTab.classList.add('active');
+                if (detailsButton) detailsButton.classList.add('active');
+            }
+            
+            // Reinitialize map if location tab is active
+            if (tab === 'location' && typeof google !== 'undefined' && typeof initMap === 'function') {
+                setTimeout(initMap, 500);
             }
         });
     </script>

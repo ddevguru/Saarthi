@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/app_theme.dart';
 import '../../../data/services/location_service.dart';
 import '../../../data/services/voice_assistant_service.dart';
@@ -32,6 +33,8 @@ class _NavigationAssistScreenState extends State<NavigationAssistScreen> {
   String _destination = '';
   String _currentInstruction = '';
   String _language = 'en';
+  bool _mapError = false;
+  String? _mapErrorMessage;
   
   Set<Polyline> _polylines = {};
   Set<Marker> _markers = {};
@@ -128,10 +131,44 @@ class _NavigationAssistScreenState extends State<NavigationAssistScreen> {
       setState(() {
         _isNavigating = false;
         _currentInstruction = _language == 'hi' 
-          ? 'रूट नहीं मिला' 
-          : 'Route not found';
+          ? 'रूट नहीं मिला। कृपया स्थान का नाम सही से लिखें या दूसरा स्थान आज़माएं।' 
+          : 'Route not found. Please check the location name or try a different location.';
       });
       await _voiceAssistant.speak(_currentInstruction);
+      
+      // Show detailed error message - route not found, but stay in app
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _language == 'hi' 
+                    ? 'रूट नहीं मिला' 
+                    : 'Route not found',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _language == 'hi' 
+                    ? 'कृपया स्थान का नाम सही से लिखें या दूसरा स्थान आज़माएं।\nउदाहरण: "Mumbai", "Andheri Station", "19.0760, 72.8777"' 
+                    : 'Please check the location name or try a different location.\nExample: "Mumbai", "Andheri Station", "19.0760, 72.8777"',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 8),
+            action: SnackBarAction(
+              label: _language == 'hi' ? 'ठीक है' : 'OK',
+              textColor: Colors.white,
+              onPressed: () {},
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -240,6 +277,133 @@ class _NavigationAssistScreenState extends State<NavigationAssistScreen> {
     _voiceAssistant.speak(_language == 'hi' ? 'नेविगेशन बंद' : 'Navigation stopped');
   }
 
+  Widget _buildMapWidget() {
+    // Show loading if position not available
+    if (_currentPosition == null) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    // Show error message if map failed to load
+    if (_mapError) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            Text(
+              _mapErrorMessage ?? (_language == 'hi' 
+                ? 'मानचित्र लोड नहीं हो सका' 
+                : 'Failed to load map'),
+              style: const TextStyle(fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _mapError = false;
+                  _mapErrorMessage = null;
+                });
+              },
+              child: Text(_language == 'hi' ? 'पुनः प्रयास करें' : 'Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Try to create GoogleMap widget with error handling
+    try {
+      return GoogleMap(
+        initialCameraPosition: CameraPosition(
+          target: LatLng(
+            _currentPosition!.latitude,
+            _currentPosition!.longitude,
+          ),
+          zoom: 15,
+        ),
+        onMapCreated: (GoogleMapController controller) {
+          _mapController = controller;
+          setState(() {
+            _mapError = false;
+            _mapErrorMessage = null;
+          });
+          
+          try {
+            // Ensure map is properly initialized
+            controller.setMapStyle(null); // Use default style
+            
+            // Animate to current position
+            controller.animateCamera(
+              CameraUpdate.newLatLngZoom(
+                LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                15,
+              ),
+            );
+            
+            print('✓ Google Maps initialized successfully');
+          } catch (e) {
+            print('Error setting map style or animating camera: $e');
+            // Don't set error state for style errors - map might still work
+          }
+        },
+        onCameraMoveStarted: () {
+          // Map is interactive - it's working
+          if (_mapError) {
+            setState(() {
+              _mapError = false;
+              _mapErrorMessage = null;
+            });
+          }
+        },
+        myLocationEnabled: true,
+        myLocationButtonEnabled: true,
+        mapType: MapType.normal,
+        polylines: _polylines,
+        markers: _markers,
+        zoomControlsEnabled: true,
+        zoomGesturesEnabled: true,
+        scrollGesturesEnabled: true,
+        tiltGesturesEnabled: true,
+        rotateGesturesEnabled: true,
+        compassEnabled: true,
+        // Add error callback if available
+        // Note: google_maps_flutter doesn't have onMapError callback
+        // We'll detect errors through onMapCreated not being called
+      );
+    } catch (e) {
+      print('Error creating GoogleMap widget: $e');
+      // Return error widget
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            Text(
+              'Error: $e',
+              style: const TextStyle(fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _mapError = false;
+                  _mapErrorMessage = null;
+                });
+              },
+              child: Text(_language == 'hi' ? 'पुनः प्रयास करें' : 'Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
   @override
   void dispose() {
     _mapController?.dispose();
@@ -258,24 +422,7 @@ class _NavigationAssistScreenState extends State<NavigationAssistScreen> {
           // Map View
           Expanded(
             flex: 2,
-            child: _currentPosition != null
-                ? GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                      target: LatLng(
-                        _currentPosition!.latitude,
-                        _currentPosition!.longitude,
-                      ),
-                      zoom: 15,
-                    ),
-                    onMapCreated: (controller) {
-                      _mapController = controller;
-                    },
-                    myLocationEnabled: true,
-                    myLocationButtonEnabled: true,
-                    polylines: _polylines,
-                    markers: _markers,
-                  )
-                : const Center(child: CircularProgressIndicator()),
+            child: _buildMapWidget(),
           ),
           
           // Navigation Controls

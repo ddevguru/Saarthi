@@ -124,40 +124,83 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
     }
   }
 
-  void _showAddChildDialog() {
-    final phoneController = TextEditingController();
+  void _showAddChildDialog() async {
     bool isLoading = false;
+    List<Map<String, dynamic>> availableChildren = [];
+    bool isLoadingChildren = true;
+
+    // Load available children first
+    try {
+      final response = await _apiClient.get(
+        '/parent/listAvailableChildren.php',
+        requireAuth: true,
+      );
+      if (response['success'] == true && response['data'] != null) {
+        availableChildren = List<Map<String, dynamic>>.from(response['data']['children'] ?? []);
+        // Filter out already linked children
+        availableChildren = availableChildren.where((child) => child['is_linked'] == 0).toList();
+      }
+    } catch (e) {
+      print('Error loading available children: $e');
+    } finally {
+      isLoadingChildren = false;
+    }
+
+    if (!mounted) return;
+
+    int? selectedChildId;
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Add Child'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Enter the phone number of the child account to link.',
-                style: TextStyle(fontSize: 14),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: phoneController,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  labelText: 'Phone Number',
-                  hintText: 'Enter 10-digit phone number',
-                  prefixIcon: Icon(Icons.phone),
-                  border: OutlineInputBorder(),
-                ),
-                maxLength: 15,
-              ),
-              if (isLoading)
-                const Padding(
-                  padding: EdgeInsets.only(top: 16),
-                  child: CircularProgressIndicator(),
-                ),
-            ],
+          content: SizedBox(
+            width: double.maxFinite,
+            child: isLoadingChildren
+                ? const Center(child: CircularProgressIndicator())
+                : availableChildren.isEmpty
+                    ? const Text('No available children to link. All USER accounts are already linked.')
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Select a child to link:',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 16),
+                          Container(
+                            constraints: const BoxConstraints(maxHeight: 300),
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: availableChildren.length,
+                              itemBuilder: (context, index) {
+                                final child = availableChildren[index];
+                                final isSelected = selectedChildId == child['id'];
+                                return RadioListTile<int>(
+                                  title: Text(child['name'] ?? 'Unknown'),
+                                  subtitle: Text(
+                                    '${child['phone'] ?? ''}${child['disability_type'] != null ? ' • ${child['disability_type']}' : ''}',
+                                  ),
+                                  value: child['id'] as int,
+                                  groupValue: selectedChildId,
+                                  onChanged: (value) {
+                                    setDialogState(() {
+                                      selectedChildId = value;
+                                    });
+                                  },
+                                  selected: isSelected,
+                                );
+                              },
+                            ),
+                          ),
+                          if (isLoading)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 16),
+                              child: CircularProgressIndicator(),
+                            ),
+                        ],
+                      ),
           ),
           actions: [
             TextButton(
@@ -167,20 +210,9 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: isLoading
+              onPressed: isLoading || selectedChildId == null
                   ? null
                   : () async {
-                      final phone = phoneController.text.trim();
-                      if (phone.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Please enter a phone number'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                        return;
-                      }
-
                       setDialogState(() {
                         isLoading = true;
                       });
@@ -188,7 +220,7 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
                       try {
                         final response = await _apiClient.post(
                           '/parent/addChild.php',
-                          {'child_phone': phone},
+                          {'child_id': selectedChildId},
                           requireAuth: true,
                         );
 

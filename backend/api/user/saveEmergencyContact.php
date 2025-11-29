@@ -45,13 +45,23 @@ if ($contactId) {
     }
 } else {
     // Create new contact
-    $stmt = $db->prepare("
-        INSERT INTO emergency_contacts (user_id, name, phone, relationship, is_primary)
-        VALUES (?, ?, ?, ?, ?)
-    ");
-    $stmt->execute([$userId, $name, $phone, $relationship, $isPrimary ? 1 : 0]);
-    $contactId = $db->lastInsertId();
-    
-    sendResponse(true, "Emergency contact saved", ['id' => $contactId], 201);
+    try {
+        $stmt = $db->prepare("
+            INSERT INTO emergency_contacts (user_id, name, phone, relationship, is_primary, is_active, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, 1, NOW(), NOW())
+        ");
+        $result = $stmt->execute([$userId, $name, $phone, $relationship, $isPrimary ? 1 : 0]);
+        
+        if ($result && $stmt->rowCount() > 0) {
+            $contactId = $db->lastInsertId();
+            sendResponse(true, "Emergency contact saved", ['id' => $contactId], 201);
+        } else {
+            error_log("Emergency contact insert failed: No rows inserted. User ID: $userId, Name: $name, Phone: $phone");
+            sendResponse(false, "Failed to save emergency contact. No rows inserted.", null, 500);
+        }
+    } catch (PDOException $e) {
+        error_log("Emergency contact insert error: " . $e->getMessage() . " | Code: " . $e->getCode());
+        sendResponse(false, "Failed to save emergency contact: " . $e->getMessage(), null, 500);
+    }
 }
 

@@ -7,7 +7,24 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
-ini_set('error_log', __DIR__ . '/../logs/error.log');
+
+// Create logs directory if it doesn't exist
+$logsDir = __DIR__ . '/../logs/';
+if (!file_exists($logsDir)) {
+    if (!mkdir($logsDir, 0755, true)) {
+        // If can't create logs directory, use system error log
+        ini_set('error_log', sys_get_temp_dir() . '/saarthi_error.log');
+    } else {
+        ini_set('error_log', $logsDir . 'error.log');
+    }
+} else {
+    ini_set('error_log', $logsDir . 'error.log');
+}
+
+// Ensure logs directory is writable
+if (file_exists($logsDir) && !is_writable($logsDir)) {
+    chmod($logsDir, 0755);
+}
 
 // Timezone
 date_default_timezone_set('Asia/Kolkata');
@@ -40,12 +57,43 @@ define('UPLOAD_DIR', __DIR__ . '/../uploads/');
 define('UPLOAD_IMAGES_DIR', UPLOAD_DIR . 'images/');
 define('UPLOAD_AUDIO_DIR', UPLOAD_DIR . 'audio/');
 
-// Create upload directories if they don't exist
-if (!file_exists(UPLOAD_IMAGES_DIR)) {
-    mkdir(UPLOAD_IMAGES_DIR, 0755, true);
+// Create upload directories if they don't exist with proper permissions
+if (!file_exists(UPLOAD_DIR)) {
+    if (!mkdir(UPLOAD_DIR, 0755, true)) {
+        error_log("Failed to create upload directory: " . UPLOAD_DIR);
+    }
 }
+
+if (!file_exists(UPLOAD_IMAGES_DIR)) {
+    if (!mkdir(UPLOAD_IMAGES_DIR, 0755, true)) {
+        error_log("Failed to create upload images directory: " . UPLOAD_IMAGES_DIR);
+    } else {
+        // Set proper permissions
+        chmod(UPLOAD_IMAGES_DIR, 0755);
+        error_log("Created upload images directory: " . UPLOAD_IMAGES_DIR);
+    }
+} else {
+    // Ensure directory is writable
+    if (!is_writable(UPLOAD_IMAGES_DIR)) {
+        chmod(UPLOAD_IMAGES_DIR, 0755);
+        error_log("Fixed permissions for upload images directory: " . UPLOAD_IMAGES_DIR);
+    }
+}
+
 if (!file_exists(UPLOAD_AUDIO_DIR)) {
-    mkdir(UPLOAD_AUDIO_DIR, 0755, true);
+    if (!mkdir(UPLOAD_AUDIO_DIR, 0755, true)) {
+        error_log("Failed to create upload audio directory: " . UPLOAD_AUDIO_DIR);
+    } else {
+        // Set proper permissions
+        chmod(UPLOAD_AUDIO_DIR, 0755);
+        error_log("Created upload audio directory: " . UPLOAD_AUDIO_DIR);
+    }
+} else {
+    // Ensure directory is writable
+    if (!is_writable(UPLOAD_AUDIO_DIR)) {
+        chmod(UPLOAD_AUDIO_DIR, 0755);
+        error_log("Fixed permissions for upload audio directory: " . UPLOAD_AUDIO_DIR);
+    }
 }
 
 // Backend base URL

@@ -189,19 +189,44 @@ if ($touch == 1) {
 // Store event if detected
 if ($eventType) {
     $stmt = $db->prepare("
-        INSERT INTO sensor_events (user_id, device_id, event_type, sensor_payload, severity)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sensor_events (user_id, device_id, event_type, sensor_payload, severity, created_at)
+        VALUES (?, ?, ?, ?, ?, NOW())
     ");
-    $stmt->execute([$userId, $deviceDbId, $eventType, $sensorPayload, $severity]);
-    $eventId = $db->lastInsertId();
+    $result = $stmt->execute([$userId, $deviceDbId, $eventType, $sensorPayload, $severity]);
     
-    // Return event_id in response for photo/audio linking
-    $responseData = [
-        'event_triggered' => true,
-        'event_type' => $eventType,
-        'severity' => $severity,
-        'event_id' => $eventId
-    ];
+    if ($result) {
+        $eventId = $db->lastInsertId();
+        error_log("=== EVENT CREATED ===");
+        error_log("Event ID: $eventId");
+        error_log("Event Type: $eventType");
+        error_log("Severity: $severity");
+        error_log("User ID: $userId");
+        error_log("Device ID: $deviceDbId");
+        error_log("Trigger Photo: " . (isset($triggerPhotoCapture) && $triggerPhotoCapture ? 'YES' : 'NO'));
+        error_log("Trigger Audio: " . (isset($triggerRecording) && $triggerRecording ? 'YES' : 'NO'));
+        error_log("====================");
+        
+        // Return event_id in response for photo/audio linking
+        $responseData = [
+            'event_triggered' => true,
+            'event_type' => $eventType,
+            'severity' => $severity,
+            'event_id' => $eventId,
+            'trigger_photo_capture' => isset($triggerPhotoCapture) ? $triggerPhotoCapture : false,
+            'trigger_audio_recording' => isset($triggerRecording) ? $triggerRecording : false
+        ];
+    } else {
+        error_log("=== EVENT CREATION FAILED ===");
+        error_log("Error Info: " . print_r($stmt->errorInfo(), true));
+        error_log("Event Type: $eventType");
+        error_log("User ID: $userId");
+        error_log("Device ID: $deviceDbId");
+        error_log("============================");
+        $responseData = [
+            'event_triggered' => false,
+            'error' => 'Failed to create event'
+        ];
+    }
     
     // Trigger alerts for critical/high events
     if (in_array($severity, ['HIGH', 'CRITICAL'])) {
@@ -274,10 +299,14 @@ if ($eventType) {
         // Combine all contacts
         $allContacts = array_merge($parents, $emergencyContacts);
         
-        // Send to all contacts (parents + emergency contacts)
+        // Send to all contacts (parents + emergency contacts) - IMMEDIATELY, no delay
         foreach ($allContacts as $contact) {
+            // Send immediately without any delay
             $whatsappService->sendMessage($contact['phone'], $message, $userId, $eventId);
         }
+        
+        // Also log for debugging
+        error_log("Alert sent immediately to " . count($allContacts) . " contacts for event $eventId");
     }
 }
 
@@ -286,13 +315,9 @@ if (isset($responseData)) {
     sendResponse(true, "Sensor data received", $responseData, 200);
 } else {
     sendResponse(true, "Sensor data received", [
-        'event_triggered' => false
+        'event_triggered' => false,
+        'event_type' => $eventType,
+        'severity' => $severity
     ], 200);
 }
-
-sendResponse(true, "Sensor data received", [
-    'event_triggered' => $eventType !== null,
-    'event_type' => $eventType,
-    'severity' => $severity
-], 200);
 

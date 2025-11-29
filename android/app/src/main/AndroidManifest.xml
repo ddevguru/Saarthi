@@ -16,6 +16,7 @@
    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
    <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+   <uses-permission android:name="android.permission.CAMERA" />
    <application
         android:label="saarthi"
         android:name="${applicationName}"
@@ -54,7 +55,7 @@
         <!-- Google Maps API Key -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AlzaSyCU8FMx2ffc-iLiflgzUwqhpEJ706q_U0w" />
+            android:value="AIzaSyCU8FMx2ffc-iLiflgzUwqhpEJ706q_U0w" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

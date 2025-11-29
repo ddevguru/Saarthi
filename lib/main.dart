@@ -19,6 +19,8 @@ import 'presentation/screens/auth/signup_screen.dart';
 // MAIN SCREENS
 import 'presentation/screens/user/user_home_screen.dart';
 import 'presentation/screens/parent/parent_home_screen.dart';
+import 'presentation/screens/parent/trip_control_screen.dart';
+import 'presentation/screens/parent/safe_zones_screen.dart';
 import 'presentation/screens/navigation/navigation_assist_screen.dart';
 import 'presentation/screens/settings/device_pairing_screen.dart';
 import 'presentation/screens/user/emergency_contacts_screen.dart';
@@ -75,8 +77,14 @@ class SaarthiApp extends StatelessWidget {
 
           // Placeholder pages
           '/quick-messages': (context) => const QuickMessagesScreen(),
-          '/safe-zones': (context) => const SafeZonesScreen(),
-          '/trip-control': (context) => const TripControlScreen(),
+          '/safe-zones': (context) {
+            final childId = ModalRoute.of(context)?.settings.arguments as int?;
+            return SafeZonesScreen(childId: childId);
+          },
+          '/trip-control': (context) {
+            final childId = ModalRoute.of(context)?.settings.arguments as int?;
+            return TripControlScreen(childId: childId);
+          },
           '/notifications': (context) => const NotificationsScreen(),
           '/settings': (context) => const SettingsScreen(),
         },
@@ -255,25 +263,9 @@ class QuickMessagesScreen extends StatelessWidget {
   }
 }
 
-class SafeZonesScreen extends StatelessWidget {
-  const SafeZonesScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-        appBar: AppBar(title: const Text("Safe Zones")),
-        body: const Center(child: Text("Coming soon")));
-  }
-}
+// SafeZonesScreen moved to separate file
 
-class TripControlScreen extends StatelessWidget {
-  const TripControlScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-        appBar: AppBar(title: const Text("Trip Control")),
-        body: const Center(child: Text("Coming soon")));
-  }
-}
+// TripControlScreen moved to separate file
 
 class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});

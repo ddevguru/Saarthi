@@ -109,10 +109,23 @@ class WakeWordService {
             }
           }
           
-          // Check for "hey/hi/hello" + "saarthi" pattern
-          if ((textLower.contains('hey') || textLower.contains('hi') || textLower.contains('hello')) &&
+          // Check for "hey/hi/hello" + "saarthi" pattern (more flexible matching)
+          if ((textLower.contains('hey') || textLower.contains('hi') || textLower.contains('hello') || textLower.contains('ok')) &&
               (textLower.contains('saarthi') || textLower.contains('sarthi') || textLower.contains('सारथी'))) {
-            print('Wake word pattern detected: "hey/hi saarthi" in "$text"');
+            print('Wake word pattern detected: "hey/hi/ok saarthi" in "$text"');
+            _onWakeWordDetected?.call();
+            _stopListening();
+            Future.delayed(const Duration(milliseconds: 500), () {
+              if (_onWakeWordDetected != null) {
+                _listenForWakeWord();
+              }
+            });
+            return;
+          }
+          
+          // Also check if just "sarthi" or "saarthi" is said (standalone)
+          if (textLower.trim() == 'saarthi' || textLower.trim() == 'sarthi' || textLower.trim() == 'सारथी') {
+            print('Wake word detected (standalone): "$text"');
             _onWakeWordDetected?.call();
             _stopListening();
             Future.delayed(const Duration(milliseconds: 500), () {

@@ -28,10 +28,13 @@ dependencies:
   geolocator: ^10.1.0
   google_maps_flutter: ^2.5.0
   location: ^5.0.3
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
   
   # Camera & Video Streaming
   camera: ^0.10.5+5
   video_player: ^2.8.1
+  webview_flutter: ^4.4.2
   
   # Text-to-Speech
   flutter_tts: ^4.0.2

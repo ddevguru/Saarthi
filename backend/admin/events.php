@@ -10,7 +10,16 @@ session_start();
 require_once __DIR__ . '/../config/database.php';
 date_default_timezone_set('Asia/Kolkata');
 
-if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'ADMIN') {
+// FIX: Prevent redirect loop - check session first, then role
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit;
+}
+
+// FIX: Check role with proper string comparison (case-insensitive)
+$userRole = isset($_SESSION['user_role']) ? strtoupper(trim($_SESSION['user_role'])) : '';
+if ($userRole !== 'ADMIN') {
+    // Always redirect to login.php (NOT users.php) to prevent infinite redirect loop
     header('Location: login.php');
     exit;
 }
