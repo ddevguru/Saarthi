@@ -21,14 +21,9 @@
 
 ## 📸 Project Media
 
-> **📷 Image Placement Guide:** Place your project images in the `assets/images/` folder and reference them like this:
-> - `![Feature Screenshot](assets/images/1.jpeg)` - For feature screenshots
-> - `![Hardware Setup](assets/images/5.jpeg)` - For hardware photos
-> - `![App Screenshot](assets/images/app_screen.png)` - For app screenshots
-> - `![ScreentShot](assets/images/3.jpeg)` - For video thumbnails
 
 **📹 Demo Videos:** 
-- [Watch Full Demo](#) - (https://youtu.be/mEKKtl-lIlc))*
+- [Watch Full Demo](#) - *(https://youtu.be/mEKKtl-lIlc)*
 
 
 **🖼️ Screenshots:**
