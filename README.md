@@ -28,20 +28,20 @@
 > - `![ScreentShot](assets/images/3.jpeg)` - For video thumbnails
 
 **📹 Demo Videos:** 
-- [Watch Full Demo](#) - *Add your YouTube/Vimeo link here (e.g., https://youtube.com/watch?v=VIDEO_ID)*
+- [Watch Full Demo](#) - *Add your YouTube/Vimeo link here (e.g., [https://youtube.com/watch?v=VIDEO_ID](https://youtu.be/mEKKtl-lIlc))*
 
 
 **🖼️ Screenshots:**
 <!-- Add your screenshots here - Uncomment and add your image paths -->
 ![App Home Screen]<img src="assets/images/1.jpeg" alt="SAARTHI Logo" width="200" height="200"><br>
-![Parent Dashboard]<img src="assets/images/3.jpeg" alt="SAARTHI Logo" width="200" height="200">
-![Admin Dashboard]<img src="assets/images/6.png" alt="SAARTHI Logo" width="200" height="200">
-![Hardware Setup]<img src="assets/images/5.png" alt="SAARTHI Logo" width="200" height="200">
-![Admin Dashboard]<img src="assets/images/7.png" alt="SAARTHI Logo" width="200" height="200">
-![Admin Panel]<img src="assets/images/8.png" alt="SAARTHI Logo" width="200" height="200">
-![Admin Panel]<img src="assets/images/9.png" alt="SAARTHI Logo" width="200" height="200">
-![Admin Panel]<img src="assets/images/10.png" alt="SAARTHI Logo" width="200" height="200">
- ![Admin Panel]<img src="assets/images/11.png" alt="SAARTHI Logo" width="200" height="200">
+![Parent Dashboard]<img src="assets/images/3.jpeg" alt="SAARTHI Logo" width="200" height="200"><br>
+![Admin Dashboard]<img src="assets/images/6.png" alt="SAARTHI Logo" width="200" height="200"><br>
+![Hardware Setup]<img src="assets/images/5.png" alt="SAARTHI Logo" width="200" height="200"><br>
+![Admin Dashboard]<img src="assets/images/7.png" alt="SAARTHI Logo" width="200" height="200"><br>
+![Admin Panel]<img src="assets/images/8.png" alt="SAARTHI Logo" width="200" height="200"><br>
+![Admin Panel]<img src="assets/images/9.png" alt="SAARTHI Logo" width="200" height="200"><br>
+![Admin Panel]<img src="assets/images/10.png" alt="SAARTHI Logo" width="200" height="200"><br>
+ ![Admin Panel]<img src="assets/images/11.png" alt="SAARTHI Logo" width="200" height="200"><br>
 
 
 
