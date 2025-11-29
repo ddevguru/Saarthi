@@ -33,15 +33,15 @@
 
 **🖼️ Screenshots:**
 <!-- Add your screenshots here - Uncomment and add your image paths -->
-![App Home Screen]<img src="assets/images/1.jpeg" alt="SAARTHI Logo" width="200" height="200"><br>
-![Parent Dashboard]<img src="assets/images/3.jpeg" alt="SAARTHI Logo" width="200" height="200"><br>
-![Admin Dashboard]<img src="assets/images/6.png" alt="SAARTHI Logo" width="200" height="200"><br>
-![Hardware Setup]<img src="assets/images/5.png" alt="SAARTHI Logo" width="200" height="200"><br>
-![Admin Dashboard]<img src="assets/images/7.png" alt="SAARTHI Logo" width="200" height="200"><br>
-![Admin Panel]<img src="assets/images/8.png" alt="SAARTHI Logo" width="200" height="200"><br>
-![Admin Panel]<img src="assets/images/9.png" alt="SAARTHI Logo" width="200" height="200"><br>
-![Admin Panel]<img src="assets/images/10.png" alt="SAARTHI Logo" width="200" height="200"><br>
- ![Admin Panel]<img src="assets/images/11.png" alt="SAARTHI Logo" width="200" height="200"><br>
+![App Home Screen]<img src="assets/images/1.jpeg" alt="SAARTHI Logo" width="200" height="200"><br><br>
+![Parent Dashboard]<img src="assets/images/3.jpeg" alt="SAARTHI Logo" width="200" height="200"><br><br>
+![Admin Dashboard]<img src="assets/images/6.png" alt="SAARTHI Logo" width="200" height="200"><br><br>
+![Hardware Setup]<img src="assets/images/5.jpeg" alt="SAARTHI Logo" width="200" height="200"><br><br>
+![Admin Dashboard]<img src="assets/images/7.png" alt="SAARTHI Logo" width="200" height="200"><br><br>
+![Admin Panel]<img src="assets/images/8.png" alt="SAARTHI Logo" width="200" height="200"><br><br>
+![Admin Panel]<img src="assets/images/9.png" alt="SAARTHI Logo" width="200" height="200"><br><br>
+![Admin Panel]<img src="assets/images/10.png" alt="SAARTHI Logo" width="200" height="200"><br><br>
+ ![Admin Panel]<img src="assets/images/11.png" alt="SAARTHI Logo" width="200" height="200"><br><br>
 
 
 
